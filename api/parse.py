@@ -945,16 +945,53 @@ class handler(BaseHTTPRequestHandler):
                 self.send_json_response({"success": False, "error": f"ไม่พบไฟล์ {display_name} บน Desktop"}, status=404)
             return
 
-        else:
-            self.send_json_response({
-                "status": "online",
-                "service": "PEA Scrap Calculator API",
-                "received_path": self.path,
-                "clean_path": path,
-                "x_matched_path": self.headers.get("x-matched-path"),
-                "x_forwarded_uri": self.headers.get("x-forwarded-uri")
-            }, status=200)
-            return
+        # Fallback static file serving if Vercel routes root requests here
+        clean_p = path.strip('/')
+        static_file = None
+        content_type = "text/plain"
+
+        if clean_p in ['', 'index.html']:
+            static_file = "index.html"
+            content_type = "text/html; charset=utf-8"
+        elif clean_p == 'style.css':
+            static_file = "style.css"
+            content_type = "text/css; charset=utf-8"
+        elif clean_p == 'app.js':
+            static_file = "app.js"
+            content_type = "application/javascript; charset=utf-8"
+        elif clean_p == 'master_data.json':
+            static_file = "master_data.json"
+            content_type = "application/json; charset=utf-8"
+
+        if static_file:
+            candidates = [
+                os.path.join(PROJECT_ROOT, static_file),
+                os.path.join(PROJECT_ROOT, "public", static_file),
+                os.path.join(API_DIR, static_file),
+                os.path.join("/var/task", static_file),
+                os.path.join("/var/task", "public", static_file)
+            ]
+            for c in candidates:
+                if os.path.exists(c):
+                    try:
+                        with open(c, 'rb') as f:
+                            data = f.read()
+                        self.send_response(200)
+                        self.send_header('Content-Type', content_type)
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+                    except Exception:
+                        pass
+
+        self.send_json_response({
+            "status": "online",
+            "service": "PEA Scrap Calculator API",
+            "received_path": self.path,
+            "clean_path": path
+        }, status=200)
+        return
 
     def do_POST(self):
         path, query = self.get_normalized_path()
