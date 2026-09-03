@@ -4,7 +4,7 @@ import os
 import re
 import sys
 import urllib.parse
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler, SimpleHTTPRequestHandler
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -855,9 +855,7 @@ def generate_export_excel(data):
     wb.save(filepath)
     return filepath, filename
 
-class PEAAppHandler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=BASE_DIR, **kwargs)
+class handler(BaseHTTPRequestHandler):
 
     def get_normalized_path(self):
         req_path = self.path
@@ -947,12 +945,9 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
                 self.send_json_response({"success": False, "error": f"ไม่พบไฟล์ {display_name} บน Desktop"}, status=404)
             return
 
-        elif path.startswith("/exports/"):
-            # Serve exported files
-            super().do_GET()
+        else:
+            self.send_json_response({"status": "online", "service": "PEA Scrap Calculator API"}, status=200)
             return
-
-        return super().do_GET()
 
     def do_POST(self):
         path, query = self.get_normalized_path()
@@ -1069,10 +1064,8 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
-# Vercel Serverless Function entrypoints
-handler = PEAAppHandler
-app = PEAAppHandler
-application = PEAAppHandler
+# Vercel Serverless Function entrypoint
+# Only export 'handler' (BaseHTTPRequestHandler) - do not define 'app' or 'application'
 
 def run_server():
     from http.server import ThreadingHTTPServer

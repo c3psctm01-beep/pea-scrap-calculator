@@ -37,7 +37,7 @@ echo.
 start "" powershell -WindowStyle Hidden -Command "Start-Sleep -Milliseconds 1500; Start-Process 'http://localhost:8080'"
 
 :: Start the Python server in foreground
-%PYTHON_CMD% server.py
+%PYTHON_CMD% local_server.py
 
 echo.
 echo เซิร์ฟเวอร์หยุดทำงานแล้ว
