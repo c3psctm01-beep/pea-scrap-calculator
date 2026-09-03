@@ -243,7 +243,12 @@ def parse_sap_excel(file_path_or_bytes):
         qty_installed = get_float(col_map['installed'])
 
         sec = str(get_val(col_map['section']) or "").strip() or current_section
-        is_dismantle = ("-R-E" in sec) or ("รื้อถอน" in sec) or ("dismantle" in sec.lower())
+        if any(k in sec for k in ['-R-E', 'แผนกรื้อถอน', 'รื้อถอน']):
+            is_dismantle = True
+        elif any(k in sec for k in ['-C-E', '-I-E', 'แผนกก่อสร้าง', 'แผนกติดตั้ง', 'ก่อสร้าง', 'ติดตั้ง']):
+            is_dismantle = False
+        else:
+            is_dismantle = ("-R-E" in sec) or ("รื้อถอน" in sec) or ("dismantle" in sec.lower())
         calc_qty = qty_est if is_dismantle else (qty_good + qty_dam if (qty_good or qty_dam) else (qty_installed or qty_issued))
 
         item_key = f"{code_clean}_{desc_raw[:15]}"
@@ -343,9 +348,10 @@ def parse_sap_pdf(file_path_or_bytes):
                 full_sample_text += el.get_text() + " "
     norm_text = " ".join(full_sample_text.split())
 
-    # Detect if whole document is a dedicated dismantle report
-    # (e.g. "(ปิดงานรื้อถอน)", "รื้อถอน", "ถอน", "(cid:202)")
-    doc_is_dismantle = bool(re.search(r'(?:ปิดงานรื้อถอน|รื้อถอน|\u0e16\u0e2d\u0e19|จำนวนพัสดุที่รื้อถอน|\(cid:202\).*?\u0e16\u0e2d\u0e19)', full_sample_text))
+    # Check if document has explicit construction / installation sections
+    has_construction_sections = bool(re.search(r'(?:-C-E|-I-E|แผนกก่อสร้าง|แผนกติดตั้ง)', full_sample_text))
+    has_dismantle_header = bool(re.search(r'(?:ปิดงานรื้อถอน|\(cid:202\).*?\u0e16\u0e2d\u0e19)', full_sample_text))
+    doc_is_pure_dismantle = has_dismantle_header and not has_construction_sections
 
     # Person
     m_person = re.search(r'นาย([^\s]+)\s+([^\s]+)\s+รหัสประจําตัว\s+(\d+)', norm_text)
@@ -385,7 +391,7 @@ def parse_sap_pdf(file_path_or_bytes):
         metadata['print_date'] = m_date.group(1)
 
     raw_items = []
-    current_section = "งานรื้อถอน (ปิดงานรื้อถอน)" if doc_is_dismantle else "งานทั่วไป"
+    current_section = "งานรื้อถอน (ปิดงานรื้อถอน)" if doc_is_pure_dismantle else "งานทั่วไป"
     seen_keys = set()
 
     for page_idx in range(num_pages_to_process):
@@ -479,8 +485,16 @@ def parse_sap_pdf(file_path_or_bytes):
                         except: pass
 
                 desc = desc.strip()
-                # Determine department type
-                is_dismantle = doc_is_dismantle or ("-R-E" in current_section) or ("รื้อถอน" in current_section) or ("\u0e16\u0e2d\u0e19" in current_section)
+                # Determine department type accurately:
+                # 1. Sections containing -R-E, รื้อถอน are dismantle
+                # 2. Sections containing -C-E, -I-E, ก่อสร้าง, ติดตั้ง are construction/installation (NEVER dismantle)
+                # 3. If no explicit section header (e.g. 018-กำแพงแสน.pdf), check if dismantle qty recorded or doc is pure dismantle
+                if any(k in current_section for k in ['-R-E', 'แผนกรื้อถอน', 'รื้อถอน']):
+                    is_dismantle = True
+                elif any(k in current_section for k in ['-C-E', '-I-E', 'แผนกก่อสร้าง', 'แผนกติดตั้ง', 'ก่อสร้าง', 'ติดตั้ง']):
+                    is_dismantle = False
+                else:
+                    is_dismantle = (qty_dismantled_record > 0) or doc_is_pure_dismantle
 
                 # Default suggested calculation quantity
                 if is_dismantle:
@@ -495,12 +509,17 @@ def parse_sap_pdf(file_path_or_bytes):
                 else:
                     calc_qty = (qty_good_return + qty_damaged_return) if (qty_good_return or qty_damaged_return) else qty_installed
 
+                if is_dismantle and (not current_section or current_section == "งานทั่วไป"):
+                    assigned_section = "งานรื้อถอน (ปิดงานรื้อถอน)"
+                else:
+                    assigned_section = current_section
+
                 item_key = f"{page_idx+1}_{code_str}_{desc[:15]}"
                 if item_key not in seen_keys:
                     seen_keys.add(item_key)
                     raw_items.append({
                         'page': page_idx + 1,
-                        'section': current_section,
+                        'section': assigned_section,
                         'is_dismantle': is_dismantle,
                         'code': code_str,
                         'code_10': code_clean,
