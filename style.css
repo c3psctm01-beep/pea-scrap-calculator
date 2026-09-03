@@ -1533,8 +1533,15 @@ body {
     display: table-header-group !important;
   }
 
+  /* Render table footer ONLY on the last page at the end of the table (never repeat on every page) */
   .print-table tfoot {
-    display: table-footer-group !important;
+    display: table-row-group !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .print-table tfoot tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .print-table tr {

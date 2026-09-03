@@ -17,7 +17,7 @@ const state = {
   items: [],
   loadedFileName: '',
   sectionFilter: 'dismantle_only',
-  matchFilter: 'all',
+  matchFilter: 'exact',
   qtySource: 'suggested',
   searchQuery: '',
   scrapPricePerKg: 12.0,
