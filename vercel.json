@@ -1,7 +1,15 @@
 {
-  "rewrites": [
-    { "source": "/api/parse-pdf", "destination": "/api/parse" },
-    { "source": "/api/load-desktop-sample", "destination": "/api/parse" },
-    { "source": "/api/desktop-samples", "destination": "/api/parse" }
+  "version": 2,
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "style.css", "use": "@vercel/static" },
+    { "src": "app.js", "use": "@vercel/static" },
+    { "src": "master_data.json", "use": "@vercel/static" },
+    { "src": "samples/**", "use": "@vercel/static" },
+    { "src": "api/index.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/(.*)", "dest": "/$1" }
   ]
 }

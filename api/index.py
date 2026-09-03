@@ -1114,7 +1114,7 @@ class handler(BaseHTTPRequestHandler):
 def run_server():
     from http.server import ThreadingHTTPServer
     server_address = ('', PORT)
-    httpd = ThreadingHTTPServer(server_address, PEAAppHandler)
+    httpd = ThreadingHTTPServer(server_address, handler)
     print(f"PEA Scrap Calculator server running at http://localhost:{PORT}")
     try:
         httpd.serve_forever()
