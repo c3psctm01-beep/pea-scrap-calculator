@@ -942,10 +942,21 @@ window.editMasterItem = function(id) {
 
 // Export to Excel
 async function handleExportExcel() {
-  const selectedItems = state.items.filter(it => it.selected);
-  if (selectedItems.length === 0) {
-    alert('กรุณาเลือกรายการพัสดุอย่างน้อย 1 รายการก่อนส่งออก Excel');
+  if (!state.items || state.items.length === 0) {
+    showToast('กรุณาโหลดไฟล์รายงานผลพัสดุ (018) ก่อนส่งออก Excel', 'warning');
     return;
+  }
+
+  let selectedItems = state.items.filter(it => it.selected);
+  if (selectedItems.length === 0) {
+    // If no items are explicitly selected, use currently filtered visible items
+    const visible = getFilteredItems();
+    if (visible.length > 0) {
+      selectedItems = visible;
+    } else {
+      showToast('กรุณาเลือกรายการพัสดุอย่างน้อย 1 รายการก่อนส่งออก Excel', 'warning');
+      return;
+    }
   }
 
   showLoading('กำลังสร้างไฟล์ Excel ตามมาตรฐาน กฟภ....');
@@ -954,7 +965,7 @@ async function handleExportExcel() {
       metadata: state.metadata,
       items: selectedItems,
       summary: {
-        total_kg: selectedItems.reduce((acc, it) => acc + it.total_weight, 0),
+        total_kg: selectedItems.reduce((acc, it) => acc + (it.total_weight || 0), 0),
         price_per_kg: state.scrapPricePerKg
       }
     };
@@ -964,6 +975,11 @@ async function handleExportExcel() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`เซิร์ฟเวอร์ตอบกลับรหัส ${res.status}: ${errText}`);
+    }
 
     const data = await res.json();
     if (data.success && (data.data_base64 || data.download_url)) {
@@ -987,25 +1003,69 @@ async function handleExportExcel() {
         downloadHref = data.download_url;
       }
 
+      const jobClean = (state.metadata.job_no || 'export').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = data.filename || `PEA_Scrap_Return_${jobClean}.xlsx`;
+
       // Trigger automatic browser download
       const a = document.createElement('a');
       a.href = downloadHref;
-      a.download = data.filename || 'รายงานคืนเศษเหล็ก_กฟภ.xlsx';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
 
       if (isBlob) {
-        setTimeout(() => URL.revokeObjectURL(downloadHref), 3000);
+        setTimeout(() => URL.revokeObjectURL(downloadHref), 5000);
       }
-      showToast('ดาวน์โหลดไฟล์ Excel เรียบร้อยแล้ว!', 'success');
+      showToast(`ดาวน์โหลดไฟล์ Excel สำเร็จเรียบร้อย (${selectedItems.length} รายการ)!`, 'success');
     } else {
-      showToast('เกิดข้อผิดพลาดในการสร้าง Excel: ' + (data.error || 'ไม่สามารถสร้างไฟล์ได้'), 'error');
+      throw new Error(data.error || 'ไม่สามารถสร้างไฟล์ได้');
     }
   } catch (err) {
-    showToast('ไม่สามารถส่งคำขอสร้าง Excel: ' + err.message, 'error');
+    console.error('Export Excel failed:', err);
+    // Fallback client-side CSV export if server endpoint fails
+    fallbackClientSideExport(selectedItems);
   } finally {
     hideLoading();
+  }
+}
+
+// Fallback client-side export if server fails for any reason
+function fallbackClientSideExport(items) {
+  try {
+    const bom = '\uFEFF'; // UTF-8 BOM for Excel Thai language support
+    const headers = ['ลำดับ', 'รหัสพัสดุ', 'รายการพัสดุ', 'อุปกรณ์เทียบเคียง', 'แผนกงาน', 'หน่วย', 'จำนวน', 'กก./หน่วย', 'น้ำหนักรวม(กก.)', 'สถานะ'];
+    const rows = items.map((it, idx) => [
+      idx + 1,
+      `"${(it.code || '').replace(/"/g, '""')}"`,
+      `"${(it.desc || '').replace(/"/g, '""')}"`,
+      `"${(it.master_name || '').replace(/"/g, '""')}"`,
+      `"${(it.section || '').replace(/"/g, '""')}"`,
+      `"${(it.unit || 'EA').replace(/"/g, '""')}"`,
+      it.calc_qty,
+      it.weight_per_unit,
+      it.total_weight,
+      `"${(it.match_type || '').replace(/"/g, '""')}"`
+    ]);
+
+    const totalKg = items.reduce((acc, it) => acc + (it.total_weight || 0), 0);
+    rows.push(['', '', '', '', '', '', '', 'รวมน้ำหนัก(กก.)', totalKg, '']);
+    rows.push(['', '', '', '', '', '', '', 'รวมน้ำหนัก(ตัน)', (totalKg / 1000).toFixed(3), '']);
+
+    const csvContent = bom + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const jobClean = (state.metadata.job_no || 'export').replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.download = `PEA_Scrap_${jobClean}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    showToast('ดาวน์โหลดไฟล์ข้อมูลสำรอง (.csv) สำเร็จเรียบร้อย!', 'success');
+  } catch (e) {
+    showToast('ไม่สามารถส่งออกไฟล์ได้: ' + e.message, 'error');
   }
 }
 

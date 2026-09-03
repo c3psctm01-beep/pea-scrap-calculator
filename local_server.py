@@ -865,7 +865,7 @@ def generate_export_excel(data):
 
     # Save to in-memory buffer (works in read-only serverless environments like Vercel)
     clean_job = re.sub(r'[^A-Za-z0-9_-]', '_', metadata.get('job_no', 'export'))
-    filename = f"รายงานคืนเศษเหล็ก_{clean_job}.xlsx"
+    filename = f"PEA_Scrap_Return_{clean_job}.xlsx"
 
     bio = io.BytesIO()
     wb.save(bio)
