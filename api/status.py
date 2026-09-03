@@ -9,7 +9,7 @@ if API_DIR not in sys.path:
     sys.path.insert(0, API_DIR)
 
 try:
-    from index import get_available_desktop_files
+    from parse import get_available_desktop_files
 except Exception:
     def get_available_desktop_files():
         return []

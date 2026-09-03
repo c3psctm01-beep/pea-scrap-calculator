@@ -1,7 +1,8 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/status", "destination": "/api/status.py" },
-    { "source": "/api/(.*)", "destination": "/api/index.py?path=$1" }
+  "routes": [
+    { "src": "/api/status", "dest": "/api/status.py" },
+    { "src": "/api/(.*)", "dest": "/api/parse.py?path=$1" },
+    { "handle": "filesystem" }
   ]
 }
