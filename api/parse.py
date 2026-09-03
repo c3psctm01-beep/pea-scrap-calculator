@@ -946,7 +946,14 @@ class handler(BaseHTTPRequestHandler):
             return
 
         else:
-            self.send_json_response({"status": "online", "service": "PEA Scrap Calculator API"}, status=200)
+            self.send_json_response({
+                "status": "online",
+                "service": "PEA Scrap Calculator API",
+                "received_path": self.path,
+                "clean_path": path,
+                "x_matched_path": self.headers.get("x-matched-path"),
+                "x_forwarded_uri": self.headers.get("x-forwarded-uri")
+            }, status=200)
             return
 
     def do_POST(self):
