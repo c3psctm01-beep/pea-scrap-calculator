@@ -335,54 +335,76 @@
     <section id="printTab" class="tab-content">
       <div class="print-control-bar no-print">
         <div class="print-info-text">
+          <span style="font-size: 16px;">🖨️</span>
           <strong>แบบฟอร์มรายงานสรุปการคืนพัสดุประเภทเศษเหล็ก</strong> (พร้อมพิมพ์ลงกระดาษ A4 หรือบันทึกเป็น PDF)
         </div>
-        <div>
-          <button class="btn btn-primary-pea" onclick="window.print()">
-            <span class="icon">🖨️</span> สั่งพิมพ์รายงาน (Print / Save as PDF)
+        <div class="print-actions-group">
+          <!-- Page Fit Toggle -->
+          <label class="toggle-fit-label" title="ย่อขนาดและจัดระยะให้จบครบใน 1 หน้า A4 ไม่ล้นหน้า">
+            <input type="checkbox" id="toggleFitOnePage" checked>
+            <span class="toggle-fit-text">📄 จัดให้อยู่ในหน้าเดียว (Fit 1 Page)</span>
+          </label>
+
+          <!-- Print Zoom Selector -->
+          <div class="print-zoom-select-wrap">
+            <label for="printScaleSelect">ขนาดพิมพ์:</label>
+            <select id="printScaleSelect" class="pea-select-sm">
+              <option value="auto">อัตโนมัติ (แนะนำ)</option>
+              <option value="100">100% (ปกติ)</option>
+              <option value="90">90% (กะทัดรัด)</option>
+              <option value="85" selected>85% (พอดี 1 หน้า)</option>
+              <option value="80">80% (แน่นกระชับ)</option>
+              <option value="75">75% (ย่อเล็ก)</option>
+            </select>
+          </div>
+
+          <!-- Print Button -->
+          <button class="btn btn-primary-pea btn-print-main" onclick="window.print()">
+            <span class="icon">🖨️</span> สั่งพิมพ์รายงาน (Print / PDF)
           </button>
         </div>
       </div>
 
-      <!-- Printable Document Sheet -->
-      <div class="print-sheet" id="printReportSheet">
-        <div class="print-memo-header">
-          <div class="print-logo-title">
-            <div class="pea-symbol">⚡ กฟภ.</div>
-            <div class="pea-official-title">
-              <h2>การไฟฟ้าส่วนภูมิภาค</h2>
-              <h3>บันทึกข้อความสรุปการคืนพัสดุประเภทเศษเหล็ก</h3>
+      <!-- Printable Document Sheet (A4 Proportion) -->
+      <div class="print-sheet-wrapper" id="printSheetWrapper">
+        <div class="print-sheet fit-page" id="printReportSheet">
+          <div class="print-memo-header">
+            <div class="print-logo-title">
+              <div class="pea-symbol">⚡ กฟภ.</div>
+              <div class="pea-official-title">
+                <h2>การไฟฟ้าส่วนภูมิภาค</h2>
+                <h3>บันทึกข้อความสรุปการคืนพัสดุประเภทเศษเหล็ก</h3>
+              </div>
+            </div>
+            <div class="print-doc-meta">
+              <div><strong>วันที่พิมพ์:</strong> <span id="printDateVal">27 ส.ค. 2564</span></div>
+              <div><strong>เอกสารอ้างอิง:</strong> รายงานปิดงาน กส. (ZPSR018)</div>
             </div>
           </div>
-          <div class="print-doc-meta">
-            <div><strong>วันที่พิมพ์:</strong> <span id="printDateVal">27 ส.ค. 2564</span></div>
-            <div><strong>เอกสารอ้างอิง:</strong> รายงานปิดงาน กส. (ZPSR018)</div>
-          </div>
-        </div>
 
-        <div class="print-meta-box">
-          <div class="print-meta-grid">
-            <div><strong>หมายเลขงาน:</strong> <span id="printJobNo">-</span></div>
-            <div><strong>ศูนย์ต้นทุน:</strong> <span id="printCostCenter">-</span></div>
-            <div class="print-full"><strong>ชื่องาน:</strong> <span id="printJobName">-</span></div>
-            <div><strong>ผู้ควบคุมงาน:</strong> <span id="printPersonName">-</span></div>
-            <div><strong>รหัสประจำตัว:</strong> <span id="printPersonId">-</span></div>
+          <div class="print-meta-box">
+            <div class="print-meta-grid">
+              <div><strong>หมายเลขงาน:</strong> <span id="printJobNo">-</span></div>
+              <div><strong>ศูนย์ต้นทุน:</strong> <span id="printCostCenter">-</span></div>
+              <div class="print-full"><strong>ชื่องาน:</strong> <span id="printJobName">-</span></div>
+              <div><strong>ผู้ควบคุมงาน:</strong> <span id="printPersonName">-</span></div>
+              <div><strong>รหัสประจำตัว:</strong> <span id="printPersonId">-</span></div>
+            </div>
           </div>
-        </div>
 
-        <table class="print-table">
-          <thead>
-            <tr>
-              <th width="35" class="text-center">ลำดับ</th>
-              <th width="100">รหัสพัสดุ</th>
-              <th>รายการอุปกรณ์เศษเหล็ก</th>
-              <th width="50" class="text-center">หน่วย</th>
-              <th width="65" class="text-right">จำนวน</th>
-              <th width="75" class="text-right">กก./หน่วย</th>
-              <th width="95" class="text-right">น้ำหนักรวม (กก.)</th>
-              <th width="120">หมายเหตุ / อ้างอิง</th>
-            </tr>
-          </thead>
+          <table class="print-table" id="printReportTable">
+            <thead>
+              <tr>
+                <th class="col-no text-center">ลำดับ</th>
+                <th class="col-code">รหัสพัสดุ</th>
+                <th class="col-desc">รายการอุปกรณ์เศษเหล็ก</th>
+                <th class="col-unit text-center">หน่วย</th>
+                <th class="col-qty text-right">จำนวน</th>
+                <th class="col-rate text-right">กก./หน่วย</th>
+                <th class="col-total text-right">น้ำหนักรวม (กก.)</th>
+                <th class="col-note">หมายเหตุ / อ้างอิง</th>
+              </tr>
+            </thead>
           <tbody id="printTableBody">
             <!-- Populated via JS -->
           </tbody>
@@ -428,7 +450,8 @@
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
     <!-- ==================== TAB 4: GUIDE TAB ==================== -->
     <section id="guideTab" class="tab-content">

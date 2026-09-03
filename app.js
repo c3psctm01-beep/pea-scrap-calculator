@@ -89,6 +89,9 @@ const elements = {
   printDateVal: document.getElementById('printDateVal'),
   printThaiWordSum: document.getElementById('printThaiWordSum'),
   signPersonName: document.getElementById('signPersonName'),
+  printReportSheet: document.getElementById('printReportSheet'),
+  toggleFitOnePage: document.getElementById('toggleFitOnePage'),
+  printScaleSelect: document.getElementById('printScaleSelect'),
   manualItemModal: document.getElementById('manualItemModal'),
   closeManualModalBtn: document.getElementById('closeManualModalBtn'),
   cancelManualModalBtn: document.getElementById('cancelManualModalBtn'),
@@ -279,6 +282,19 @@ function setupEventListeners() {
       }
     });
   });
+
+  // Print Fit & Scale Listeners
+  if (elements.toggleFitOnePage) {
+    elements.toggleFitOnePage.addEventListener('change', () => {
+      applyPrintFit();
+    });
+  }
+
+  if (elements.printScaleSelect) {
+    elements.printScaleSelect.addEventListener('change', () => {
+      applyPrintFit();
+    });
+  }
 
   // Server retry button
   if (elements.retryServerBtn) {
@@ -1007,6 +1023,46 @@ function renderPrintReport() {
   }
 
   elements.printThaiWordSum.textContent = `รวมรายการพัสดุคืนเศษเหล็กทั้งสิ้น ${selectedItems.length} รายการ | น้ำหนักรวมสุทธิ ${totalKg.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กิโลกรัม (${totalTons.toFixed(3)} ตัน)`;
+
+  // Apply responsive Fit-to-1-Page & zoom scale
+  applyPrintFit();
+}
+
+// Apply Print Fit & Zoom Scale
+function applyPrintFit() {
+  const sheet = elements.printReportSheet || document.getElementById('printReportSheet');
+  const toggle = elements.toggleFitOnePage || document.getElementById('toggleFitOnePage');
+  const scaleSelect = elements.printScaleSelect || document.getElementById('printScaleSelect');
+  if (!sheet) return;
+
+  const isFit = toggle ? toggle.checked : true;
+  sheet.classList.toggle('fit-page', isFit);
+
+  const scaleVal = scaleSelect ? scaleSelect.value : 'auto';
+  const selectedCount = state.items ? state.items.filter(it => it.selected).length : 0;
+
+  if (scaleVal === 'auto') {
+    if (!isFit) {
+      sheet.style.transform = 'none';
+    } else if (selectedCount <= 12) {
+      sheet.style.transform = 'scale(1)';
+    } else if (selectedCount <= 16) {
+      sheet.style.transform = 'scale(0.93)';
+    } else if (selectedCount <= 22) {
+      sheet.style.transform = 'scale(0.85)';
+    } else if (selectedCount <= 30) {
+      sheet.style.transform = 'scale(0.78)';
+    } else {
+      sheet.style.transform = 'scale(0.72)';
+    }
+  } else {
+    const num = parseFloat(scaleVal);
+    if (!isNaN(num) && num > 0) {
+      sheet.style.transform = `scale(${num / 100})`;
+    } else {
+      sheet.style.transform = 'none';
+    }
+  }
 }
 
 // Helpers: Loading Overlay & Toast
