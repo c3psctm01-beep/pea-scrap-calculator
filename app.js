@@ -186,15 +186,26 @@ async function checkServerHealth() {
 
   // If reached here, server is offline
   state.isServerOnline = false;
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const offlineAlertText = document.getElementById('offlineAlertText');
+
+  if (offlineAlertText) {
+    if (isLocalhost) {
+      offlineAlertText.innerHTML = '<strong>เซิร์ฟเวอร์หลังบ้านออฟไลน์:</strong> ระบบประมวลผลจำเป็นต้องเปิดไฟล์ <code>start_app.bat</code> เพื่อเริ่มการทำงาน';
+    } else {
+      offlineAlertText.innerHTML = '<strong>กำลังเชื่อมต่อ Cloud Serverless:</strong> หากเปิดเว็บเป็นครั้งแรก Vercel กำลังเตรียมฟังก์ชันประมวลผล กรุณารอสักครู่แล้วกดปุ่ม <em>"ตรวจสอบการเชื่อมต่อ"</em>';
+    }
+  }
+
   if (statusBadge) {
     statusBadge.classList.add('offline');
-    statusBadge.title = 'คลิกเพื่อดูคำแนะนำการเปิดเซิร์ฟเวอร์';
+    statusBadge.title = isLocalhost ? 'เซิร์ฟเวอร์ Local ยังไม่เปิด (start_app.bat)' : 'กำลังเชื่อมต่อ Cloud Serverless';
   }
   if (statusDot) {
     statusDot.className = 'status-dot offline';
   }
   if (statusText) {
-    statusText.textContent = 'เซิร์ฟเวอร์ออฟไลน์';
+    statusText.textContent = isLocalhost ? 'เซิร์ฟเวอร์ออฟไลน์' : 'กำลังเชื่อมต่อ Cloud...';
   }
   if (offlineBanner) {
     offlineBanner.style.display = 'block';
