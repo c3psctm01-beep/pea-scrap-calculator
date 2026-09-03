@@ -1,8 +1,7 @@
 {
   "rewrites": [
-    { "source": "/api/status", "destination": "/api/status.py" },
-    { "source": "/api/parse-pdf", "destination": "/api/parse.py?path=parse-pdf" },
-    { "source": "/api/load-desktop-sample", "destination": "/api/parse.py?path=load-desktop-sample" },
-    { "source": "/api/desktop-samples", "destination": "/api/parse.py?path=desktop-samples" }
+    { "source": "/api/parse-pdf", "destination": "/api/parse" },
+    { "source": "/api/load-desktop-sample", "destination": "/api/parse" },
+    { "source": "/api/desktop-samples", "destination": "/api/parse" }
   ]
 }
