@@ -867,7 +867,12 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
                 req_path = hval
                 break
         url_parts = urllib.parse.urlparse(req_path)
-        return url_parts.path, urllib.parse.parse_qs(url_parts.query)
+        path = url_parts.path
+        query = urllib.parse.parse_qs(url_parts.query)
+        route = query.get('path', [''])[0] or query.get('endpoint', [''])[0]
+        if route:
+            path = '/' + route.lstrip('/')
+        return path, query
 
     def do_GET(self):
         path, query = self.get_normalized_path()
@@ -1064,8 +1069,10 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
-# Vercel Serverless Function entrypoint
+# Vercel Serverless Function entrypoints
 handler = PEAAppHandler
+app = PEAAppHandler
+application = PEAAppHandler
 
 def run_server():
     from http.server import ThreadingHTTPServer

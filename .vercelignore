@@ -1,0 +1,7 @@
+server.py
+start_app.bat
+exports/
+*.xlsx
+*.bat
+.git/
+.vscode/

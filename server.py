@@ -1054,6 +1054,11 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
+# Top-level exports for Vercel Python runtime
+handler = PEAAppHandler
+app = PEAAppHandler
+application = PEAAppHandler
+
 def run_server():
     from http.server import ThreadingHTTPServer
     server_address = ('', PORT)
