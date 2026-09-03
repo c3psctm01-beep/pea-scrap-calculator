@@ -1,8 +1,8 @@
 {
-  "version": 2,
-  "routes": [
-    { "src": "/api/status", "dest": "/api/status.py" },
-    { "src": "/api/(.*)", "dest": "/api/parse.py?path=$1" },
-    { "handle": "filesystem" }
+  "rewrites": [
+    { "source": "/api/status", "destination": "/api/status.py" },
+    { "source": "/api/parse-pdf", "destination": "/api/parse.py?path=parse-pdf" },
+    { "source": "/api/load-desktop-sample", "destination": "/api/parse.py?path=load-desktop-sample" },
+    { "source": "/api/desktop-samples", "destination": "/api/parse.py?path=desktop-samples" }
   ]
 }
