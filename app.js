@@ -966,17 +966,41 @@ async function handleExportExcel() {
     });
 
     const data = await res.json();
-    if (data.success && data.download_url) {
-      // Trigger download
+    if (data.success && (data.data_base64 || data.download_url)) {
+      let downloadHref;
+      let isBlob = false;
+
+      if (data.data_base64) {
+        // Decode base64 to binary Blob directly in browser memory (instant download on Vercel)
+        const binaryStr = atob(data.data_base64);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        downloadHref = URL.createObjectURL(blob);
+        isBlob = true;
+      } else {
+        downloadHref = data.download_url;
+      }
+
+      // Trigger automatic browser download
       const a = document.createElement('a');
-      a.href = data.download_url;
-      a.download = data.filename;
+      a.href = downloadHref;
+      a.download = data.filename || 'รายงานคืนเศษเหล็ก_กฟภ.xlsx';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+
+      if (isBlob) {
+        setTimeout(() => URL.revokeObjectURL(downloadHref), 3000);
+      }
       showToast('ดาวน์โหลดไฟล์ Excel เรียบร้อยแล้ว!', 'success');
     } else {
-      showToast('เกิดข้อผิดพลาดในการสร้าง Excel: ' + (data.error || ''), 'error');
+      showToast('เกิดข้อผิดพลาดในการสร้าง Excel: ' + (data.error || 'ไม่สามารถสร้างไฟล์ได้'), 'error');
     }
   } catch (err) {
     showToast('ไม่สามารถส่งคำขอสร้าง Excel: ' + err.message, 'error');

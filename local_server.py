@@ -1,4 +1,6 @@
+import base64
 import http.server
+import io
 import json
 import os
 import re
@@ -861,14 +863,25 @@ def generate_export_excel(data):
         c_sig3.alignment = Alignment(horizontal="center")
         c_sig3.font = font_data
 
-    # Save to a temporary or requested file
-    export_dir = os.path.join(BASE_DIR, "exports")
-    os.makedirs(export_dir, exist_ok=True)
+    # Save to in-memory buffer (works in read-only serverless environments like Vercel)
     clean_job = re.sub(r'[^A-Za-z0-9_-]', '_', metadata.get('job_no', 'export'))
     filename = f"รายงานคืนเศษเหล็ก_{clean_job}.xlsx"
-    filepath = os.path.join(export_dir, filename)
-    wb.save(filepath)
-    return filepath, filename
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    excel_bytes = bio.getvalue()
+
+    # If running locally and disk is writable, save a copy to exports folder
+    try:
+        export_dir = os.path.join(BASE_DIR, "exports")
+        os.makedirs(export_dir, exist_ok=True)
+        filepath = os.path.join(export_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(excel_bytes)
+    except Exception:
+        filepath = None
+
+    return excel_bytes, filename
 
 class PEAAppHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -1033,12 +1046,13 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length)
             try:
                 data = json.loads(body.decode('utf-8'))
-                filepath, filename = generate_export_excel(data)
-                download_url = f"/exports/{urllib.parse.quote(filename)}"
+                excel_bytes, filename = generate_export_excel(data)
+                b64_data = base64.b64encode(excel_bytes).decode('utf-8')
                 self.send_json_response({
                     "success": True,
                     "filename": filename,
-                    "download_url": download_url
+                    "data_base64": b64_data,
+                    "download_url": f"/exports/{urllib.parse.quote(filename)}"
                 })
             except Exception as e:
                 self.send_json_response({"success": False, "error": f"Export error: {str(e)}"}, status=500)
