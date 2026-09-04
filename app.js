@@ -122,25 +122,62 @@ async function init() {
   checkServerHealth();
 }
 
+// Master data storage key
+const STORAGE_MASTER_KEY = 'pea_custom_master_data';
+
 // Load Master Scrap Weights
-async function loadMasterData() {
+async function loadMasterData(forceReset = false) {
+  let serverData = [];
   try {
     const res = await fetch('/api/master-data');
     if (res.ok) {
-      state.masterData = await res.json();
+      serverData = await res.json();
     } else {
       // Fallback load local master_data.json
       const localRes = await fetch('master_data.json');
-      state.masterData = await localRes.json();
+      serverData = await localRes.json();
     }
   } catch (err) {
     console.warn('Could not load from API, falling back to local master_data.json:', err);
     try {
       const localRes = await fetch('master_data.json');
-      state.masterData = await localRes.json();
+      serverData = await localRes.json();
     } catch (e) {
       console.error('Failed to load master data:', e);
-      state.masterData = [];
+      serverData = [];
+    }
+  }
+
+  if (forceReset) {
+    try {
+      localStorage.removeItem(STORAGE_MASTER_KEY);
+    } catch (e) {}
+    state.masterData = serverData;
+  } else {
+    // Check if custom master exists in localStorage
+    let savedLocal = null;
+    try {
+      savedLocal = localStorage.getItem(STORAGE_MASTER_KEY);
+    } catch (e) {}
+
+    if (savedLocal) {
+      try {
+        const parsed = JSON.parse(savedLocal);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          state.masterData = parsed;
+        } else {
+          state.masterData = serverData;
+        }
+      } catch (e) {
+        state.masterData = serverData;
+      }
+    } else {
+      state.masterData = serverData;
+      if (serverData.length > 0) {
+        try {
+          localStorage.setItem(STORAGE_MASTER_KEY, JSON.stringify(serverData));
+        } catch (e) {}
+      }
     }
   }
 
@@ -446,8 +483,8 @@ function setupEventListeners() {
   elements.saveMasterItemBtn.addEventListener('click', handleSaveMasterItem);
 
   elements.resetMasterBtn.addEventListener('click', async () => {
-    if (confirm('คุณต้องการคืนค่าฐานข้อมูลน้ำหนักอุปกรณ์เป็นค่าเริ่มต้นจาก Desktop Excel ใช่หรือไม่?')) {
-      await loadMasterData();
+    if (confirm('คุณต้องการคืนค่าฐานข้อมูลน้ำหนักอุปกรณ์เป็นค่าเริ่มต้น (71 รายการ) ใช่หรือไม่?\nรายการที่คุณเพิ่มหรือแก้ไขเองจะถูกรีเซ็ต')) {
+      await loadMasterData(true);
       showToast('คืนค่าฐานข้อมูลน้ำหนักเริ่มต้นเรียบร้อย', 'success');
     }
   });
@@ -465,6 +502,7 @@ async function handleFileUpload(file) {
   showLoading(`กำลังวิเคราะห์ไฟล์ ${file.name}...`);
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('master_data', JSON.stringify(state.masterData));
 
   try {
     const res = await fetch('/api/parse-pdf', {
@@ -490,11 +528,43 @@ async function handleFileUpload(file) {
 function processLoadedData(data) {
   state.loadedFileName = data.filename || '018.pdf';
   state.metadata = data.metadata || {};
-  state.items = (data.items || []).map((it, idx) => ({
-    ...it,
-    id: idx + 1,
-    selected: it.is_dismantle && it.match_type === 'exact'
-  }));
+
+  // Build lookup index from current masterData (includes user-added items)
+  const masterBy10 = {};
+  state.masterData.forEach(m => {
+    if (m.code) masterBy10[m.code] = m;
+  });
+
+  state.items = (data.items || []).map((it, idx) => {
+    let matchType = it.match_type || 'none';
+    let weightPerUnit = it.weight_per_unit || 0;
+    let masterName = it.master_name || '';
+    let masterCode = it.master_code || '';
+    const code10 = it.code_10 || (it.code ? it.code.replace(/\D/g, '') : '');
+
+    // Check if code matches masterData directly
+    if (code10 && masterBy10[code10]) {
+      const m = masterBy10[code10];
+      matchType = 'exact';
+      weightPerUnit = m.weight_per_unit;
+      masterName = m.name;
+      masterCode = m.code || '';
+    }
+
+    const calcQty = it.calc_qty !== undefined ? it.calc_qty : (it.suggested_qty || 0);
+    const totalWeight = Math.round((calcQty * weightPerUnit) * 1000) / 1000;
+
+    return {
+      ...it,
+      id: idx + 1,
+      match_type: matchType,
+      weight_per_unit: weightPerUnit,
+      master_name: masterName,
+      master_code: masterCode,
+      total_weight: totalWeight,
+      selected: it.is_dismantle && matchType === 'exact'
+    };
+  });
 
   // Update UI Metadata
   elements.projectBanner.style.display = 'block';
@@ -831,8 +901,9 @@ function renderMasterTable() {
       <td class="font-bold">${m.name}</td>
       <td class="text-right font-bold text-purple">${m.weight_per_unit.toFixed(2)}</td>
       <td class="text-center">${m.unit || 'กก.'}</td>
-      <td class="text-center">
+      <td class="text-center" style="white-space: nowrap;">
         <button class="btn btn-outline-pea btn-sm" onclick="editMasterItem(${m.id})">แก้ไข</button>
+        <button class="btn btn-delete-row btn-sm" onclick="deleteMasterItem(${m.id})" title="ลบรายการนี้" style="margin-left: 4px; padding: 2px 6px;">🗑️</button>
       </td>
     `;
     elements.masterTableBody.appendChild(tr);
@@ -933,12 +1004,20 @@ async function handleSaveMasterItem() {
     });
   }
 
+  // Persist to localStorage immediately (never lost on refresh)
+  try {
+    localStorage.setItem(STORAGE_MASTER_KEY, JSON.stringify(state.masterData));
+  } catch (err) {
+    console.warn('Could not save to localStorage:', err);
+  }
+
   elements.masterItemModal.style.display = 'none';
   renderMasterTable();
   elements.masterCountBadge.textContent = state.masterData.length;
   elements.masterTotalItems.textContent = state.masterData.length;
+  populateManualModalSelect();
 
-  // Persist to server
+  // Persist to server (if local server is running)
   try {
     await fetch('/api/save-master-data', {
       method: 'POST',
@@ -949,7 +1028,7 @@ async function handleSaveMasterItem() {
     console.warn('Could not persist to server:', e);
   }
 
-  showToast('บันทึกข้อมูลอุปกรณ์ในฐานข้อมูลเรียบร้อย', 'success');
+  showToast('บันทึกข้อมูลอุปกรณ์ในฐานข้อมูลเรียบร้อย (บันทึกถาวร)', 'success');
 }
 
 window.editMasterItem = function(id) {
@@ -963,6 +1042,39 @@ window.editMasterItem = function(id) {
     elements.masterItemUnit.value = m.unit;
     elements.masterItemModal.style.display = 'flex';
   }
+};
+
+window.deleteMasterItem = async function(id) {
+  const m = state.masterData.find(it => it.id == id);
+  if (!m) return;
+  if (!confirm(`คุณต้องการลบอุปกรณ์ "${m.name}" ออกจากฐานข้อมูลใช่หรือไม่?`)) return;
+
+  state.masterData = state.masterData.filter(it => it.id != id);
+
+  // Update localStorage
+  try {
+    localStorage.setItem(STORAGE_MASTER_KEY, JSON.stringify(state.masterData));
+  } catch (err) {
+    console.warn('Could not save to localStorage:', err);
+  }
+
+  renderMasterTable();
+  elements.masterCountBadge.textContent = state.masterData.length;
+  elements.masterTotalItems.textContent = state.masterData.length;
+  populateManualModalSelect();
+
+  // Persist to server
+  try {
+    await fetch('/api/save-master-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state.masterData)
+    });
+  } catch (e) {
+    console.warn('Could not persist to server:', e);
+  }
+
+  showToast(`ลบรายการ "${m.name}" เรียบร้อย`, 'success');
 };
 
 // Export to Excel

@@ -1001,8 +1001,19 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
                 file_bytes = None
                 filename = "uploaded_file"
 
+                custom_master = None
                 for part in parts:
-                    if b'filename=' in part:
+                    if b'name="master_data"' in part:
+                        h_end = part.find(b"\r\n\r\n")
+                        if h_end != -1:
+                            r_d = part[h_end+4:]
+                            if r_d.endswith(b"\r\n"):
+                                r_d = r_d[:-2]
+                            try:
+                                custom_master = json.loads(r_d.decode('utf-8'))
+                            except Exception:
+                                pass
+                    elif b'filename=' in part:
                         # Extract filename
                         header_part = part[:1000].decode('utf-8', errors='ignore')
                         m_fn = re.search(r'filename="?([^";\r\n]+)"?', header_part)
@@ -1015,7 +1026,6 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
                             if raw_data.endswith(b"\r\n"):
                                 raw_data = raw_data[:-2]
                             file_bytes = raw_data
-                            break
 
                 if file_bytes:
                     try:
@@ -1031,7 +1041,7 @@ class PEAAppHandler(SimpleHTTPRequestHandler):
                         else:
                             result = parse_sap_pdf(file_bytes)
 
-                        master = load_master_data()
+                        master = custom_master if (custom_master and isinstance(custom_master, list) and len(custom_master) > 0) else load_master_data()
                         enriched = match_items_with_master(result['items'], master)
                         self.send_json_response({
                             "success": True,
