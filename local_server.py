@@ -611,8 +611,8 @@ def match_items_with_master(pdf_items, master_data):
         master_name = matched_master['name'] if matched_master else ''
         calc_qty = item.get('suggested_qty', 0.0)
 
-        # By default, items in dismantle section (-R-E) with matched scrap weight are selected
-        is_selected = item.get('is_dismantle', False) and (weight_per_unit > 0 or match_type in ['exact', 'suggested'])
+        # By default, only items in dismantle section (-R-E) with 100% exact match are selected
+        is_selected = item.get('is_dismantle', False) and (match_type == 'exact')
 
         enriched_items.append({
             **item,
@@ -886,6 +886,13 @@ def generate_export_excel(data):
 class PEAAppHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=BASE_DIR, **kwargs)
+
+    def end_headers(self):
+        # Prevent browser from caching static files (app.js, index.html, etc.)
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
 
     def do_GET(self):
         url_parts = urllib.parse.urlparse(self.path)

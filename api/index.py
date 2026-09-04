@@ -615,8 +615,8 @@ def match_items_with_master(pdf_items, master_data):
         master_name = matched_master['name'] if matched_master else ''
         calc_qty = item.get('suggested_qty', 0.0)
 
-        # By default, items in dismantle section (-R-E) with matched scrap weight are selected
-        is_selected = item.get('is_dismantle', False) and (weight_per_unit > 0 or match_type in ['exact', 'suggested'])
+        # By default, only items in dismantle section (-R-E) with 100% exact match are selected
+        is_selected = item.get('is_dismantle', False) and (match_type == 'exact')
 
         enriched_items.append({
             **item,

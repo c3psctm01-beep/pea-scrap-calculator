@@ -492,7 +492,8 @@ function processLoadedData(data) {
   state.metadata = data.metadata || {};
   state.items = (data.items || []).map((it, idx) => ({
     ...it,
-    id: idx + 1
+    id: idx + 1,
+    selected: it.is_dismantle && it.match_type === 'exact'
   }));
 
   // Update UI Metadata
@@ -671,6 +672,7 @@ function renderCalcTable() {
 
   // Attach Table Row Event Listeners
   attachTableRowListeners();
+  updateMasterCheckboxState();
   updateKPICards();
 }
 
@@ -685,6 +687,7 @@ function attachTableRowListeners() {
         item.selected = e.target.checked;
         const tr = e.target.closest('tr');
         if (tr) tr.classList.toggle('row-selected', item.selected);
+        updateMasterCheckboxState();
         updateKPICards();
       }
     });
@@ -749,6 +752,28 @@ function attachTableRowListeners() {
       renderCalcTable();
     });
   });
+}
+
+// Update master checkbox state based on currently visible items
+function updateMasterCheckboxState() {
+  if (!elements.masterCheckbox) return;
+  const filtered = getFilteredItems();
+  if (filtered.length === 0) {
+    elements.masterCheckbox.checked = false;
+    elements.masterCheckbox.indeterminate = false;
+    return;
+  }
+  const selectedCount = filtered.filter(it => it.selected).length;
+  if (selectedCount === 0) {
+    elements.masterCheckbox.checked = false;
+    elements.masterCheckbox.indeterminate = false;
+  } else if (selectedCount === filtered.length) {
+    elements.masterCheckbox.checked = true;
+    elements.masterCheckbox.indeterminate = false;
+  } else {
+    elements.masterCheckbox.checked = false;
+    elements.masterCheckbox.indeterminate = true;
+  }
 }
 
 // Toggle visible items
